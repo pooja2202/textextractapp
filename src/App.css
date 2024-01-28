@@ -1,0 +1,66 @@
+.App {
+  text-align: center;
+}
+
+.container {
+  display: flex;
+}
+
+.center-section{
+    flex: 0 0 30%; /* 30% width, do not grow or shrink */
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  background-color: #bce2ff; /* Light gray background */
+}
+
+.left-section {
+  flex: 0 0 30%; /* 30% width, do not grow or shrink */
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffd4b8; /* Light gray background */
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.input-group label {
+  flex: 1;
+}
+
+.right-section {
+  flex: 0 0 40%; /* 70% width, do not grow or shrink */
+  padding: 20px;
+  background-color: #ddedc3; /* White background */
+}
+
+.selected-field {
+  flex: 0 0 10%; /* 10% width, do not grow or shrink */
+  border: 1px solid black;
+  margin-left: 20px; /* Add some margin for spacing */
+  padding: 10px;
+  width: 200px;
+  background-color: #f9f9f9; /* Light gray background */
+}
+
+.uploaded-image {
+  flex: 0 0 60%; /* 60% width, do not grow or shrink */
+  max-width: 100%;
+  margin-top: 20px;
+  border: 1px solid #ddd; /* Light gray border */
+  background-color: #fff; /* White background */
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Soft shadow effect */
+}
+
+.hovered-text {
+  border: 2px solid red; /* Adjust color and thickness as needed */
+}
+
+.highlight {
+  background-color: yellow;
+  font-weight: bold;
+}
