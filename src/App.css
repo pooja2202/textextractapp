@@ -15,7 +15,7 @@
 }
 
 .left-section {
-  flex: 0 0 30%; /* 30% width, do not grow or shrink */
+  flex: 0 0 10%; /* 30% width, do not grow or shrink */
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -33,7 +33,7 @@
 }
 
 .right-section {
-  flex: 0 0 40%; /* 70% width, do not grow or shrink */
+  flex: 0 0 80%; /* 70% width, do not grow or shrink */
   padding: 20px;
   background-color: #ddedc3; /* White background */
 }

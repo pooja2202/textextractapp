@@ -32,6 +32,8 @@ function App() {
   const [inputAddressValue, setInputAddressValue] = useState("");
   const [inputEmailValue, setInputEmailValue] = useState("");
   const [inputPhoneValue, setInputPhoneValue] = useState("");
+  const [fileValue, setFileValue] = useState(null);
+  const [modifiedImageSrc, setModifiedImageSrc] = useState(null);
 
   const onSelectFile = (e) => {
     if (!e.target.files || e.target.files.length === 0) {
@@ -39,7 +41,7 @@ function App() {
     }
     const reader = new FileReader();
     const file = e.target.files[0];
-
+    setFileValue(file);
     reader.onload = function (upload) {
       setSrc(upload?.target?.result);
     };
@@ -82,28 +84,25 @@ function App() {
     try {
       const data = await client.send(command);
       // const data = await client.send(command);
-      console.log("pooja raw data------", data);
+      // console.log("pooja raw data------", data);
       const raw_text = extractText(data);
-      console.log("pooja raw_text---", raw_text);
+      // console.log("pooja raw_text---", raw_text);
       const word_map = mapWordId(data);
-      console.log("pooja word_map---", word_map);
+      // console.log("pooja word_map---", word_map);
       const table_data = extractTableInfo(data, word_map);
-      console.log("pooja table_data----", table_data);
+      // console.log("pooja table_data----", table_data);
       const key_map = getKeyMap(data, word_map);
-      console.log("pooja key_map-----", key_map);
+      // console.log("pooja key_map-----", key_map);
       const value_map = getValueMap(data, word_map);
-      console.log("pooja value_map-----", value_map);
+      // console.log("pooja value_map-----", value_map);
       const final_map = getKvMap(key_map, value_map);
-      console.log("pooja final_map-----", final_map);
-      // AWS.config.update({
-      //   region: "ap-south-1",
-      //   credentials: new AWS.Credentials({
-      //     accessKeyId: "AKIAYRK5RWLUDM2GONFC",
-      //     secretAccessKey: "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",
-      //   }),
-      // });
-      // const s3 = new AWS.S3();
-      // processResponse(data, s3, "getstartednewbucket", "testimgpt1.png");
+      // console.log("pooja final_map-----", final_map);
+      const modifiedImageUrl = await processResponse(
+        data,
+        "testimgpt1.png",
+        fileValue
+      );
+      setModifiedImageSrc(modifiedImageUrl);
       // process data
       if (data?.Blocks) {
         const filteredArray = data?.Blocks.filter(
@@ -255,13 +254,18 @@ function App() {
             );
           })}
         </div> */}
-        <Canvas
+        <div style={{ width: "200px", height: "200px" }}>
+          {modifiedImageSrc && (
+            <img src={modifiedImageSrc} alt="Modified Image" />
+          )}
+        </div>
+        {/* <Canvas
           width="500"
           height="1900"
           draw={(context, count, isHovering, x, y) =>
             draw(context, count, isHovering, x, y, texts)
           }
-        />
+        /> */}
       </div>
     </div>
   );

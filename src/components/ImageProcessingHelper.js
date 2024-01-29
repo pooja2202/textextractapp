@@ -1,185 +1,230 @@
-// // ImageProcessingHelper.js
-// import React, { useEffect, useRef } from "react";
-// import useCanvas from "../hooks/useCanvas";
-// import { loadImage } from "canvas";
+// ImageProcessingHelper.js
+import React, { useEffect, useRef } from "react";
+import AWS from "aws-sdk";
 
-// function processError(error) {
-//   return JSON.stringify({
-//     errorType: error.name,
-//     errorMessage: error.message,
-//     stackTrace: error.stack,
-//   });
-// }
+function processError(error) {
+  console.error(error);
+  return false;
+}
 
-// async function uploadToS3(s3, buffer, BUCKET_NAME, key) {
-//   await s3
-//     .putObject({
-//       Bucket: BUCKET_NAME,
-//       Key: key,
-//       Body: buffer,
-//     })
-//     .promise();
-// }
+async function uploadToS3(s3, buffer, BUCKET_NAME, key) {
+  await s3
+    .putObject({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+    })
+    .promise();
+}
 
-// function drawBoundingBox(ctx, image, height, width, box, colorCode, thickness) {
-//   ctx.drawImage(image, 0, 0, width, height);
+function drawBoundingBox(ctx, height, width, boundingBox, color, lineWidth) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
 
-//   const left = width * box.Left;
-//   const top = height * box.Top;
-//   const boxWidth = width * box.Width;
-//   const boxHeight = height * box.Height;
+  const x = boundingBox.Left * width;
+  const y = boundingBox.Top * height;
+  const w = boundingBox.Width * width;
+  const h = boundingBox.Height * height;
 
-//   ctx.strokeStyle = colorCode;
-//   ctx.lineWidth = thickness;
-//   ctx.beginPath();
-//   ctx.rect(left, top, boxWidth, boxHeight);
-//   ctx.stroke();
-// }
+  ctx.strokeRect(x, y, w, h);
+}
 
-// function useImageProcessing(response, s3, bucketName, fileName) {
-//   const canvasRef = useRef(null);
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
 
-//   useEffect(() => {
-//     async function processResponse() {
-//       const selectedFile = fileName;
-//       const image = await loadImage(selectedFile);
-//       const height = image.height;
-//       const width = image.width;
+    reader.onload = (event) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Failed to load image"));
 
-//       const canvas = canvasRef.current;
-//       const ctx = canvas.getContext("2d");
+      // Set the source to the data URL obtained from the FileReader
+      image.src = event.target.result;
+    };
 
-//       for (const block of response.Blocks) {
-//         if (block.BlockType === "KEY_VALUE_SET") {
-//           const color =
-//             block.EntityTypes[0] === "KEY"
-//               ? "rgba(0, 0, 255, 1)"
-//               : "rgba(0, 255, 0, 1)";
-//           const boundingBox = block.Geometry.BoundingBox;
-//           drawBoundingBox(ctx, image, height, width, boundingBox, color, 1);
-//         } else if (block.BlockType === "TABLE") {
-//           const boundingBox = block.Geometry.BoundingBox;
-//           drawBoundingBox(
-//             ctx,
-//             image,
-//             height,
-//             width,
-//             boundingBox,
-//             "rgba(255, 0, 0, 1)",
-//             2
-//           );
-//         } else if (block.BlockType === "CELL") {
-//           const boundingBox = block.Geometry.BoundingBox;
-//           drawBoundingBox(
-//             ctx,
-//             image,
-//             height,
-//             width,
-//             boundingBox,
-//             "rgba(0, 255, 255, 1)",
-//             1
-//           );
-//         } else if (
-//           block.BlockType === "SELECTION_ELEMENT" &&
-//           block.SelectionStatus === "SELECTED"
-//         ) {
-//           const boundingBox = block.Geometry.BoundingBox;
-//           drawBoundingBox(
-//             ctx,
-//             image,
-//             height,
-//             width,
-//             boundingBox,
-//             "rgba(0, 0, 255, 1)",
-//             1
-//           );
-//         }
-//       }
+    reader.readAsDataURL(file);
+  });
+}
 
-//       const buffer = canvas.toBuffer("image/png");
-//       await uploadToS3(
-//         s3,
-//         buffer,
-//         bucketName,
-//         `processed/${fileName.split("/").pop()}`
-//       );
-//     }
-
-//     processResponse();
-//   }, [response, s3, bucketName, fileName]);
-
-//   return canvasRef;
-// }
-
-// async function processResponse(response, s3, bucketName, fileName) {
+// async function processResponse(response, bucketName, fileName) {
+//   console.log("processResponse");
 //   try {
-//     const selectedFile = fileName;
+//     const selectedFile =
+//       "https://getstartednewbucket.s3.ap-south-1.amazonaws.com/testimgpt1.png";
+
+//     // Use await to get the resolved image before proceeding
 //     const image = await loadImage(selectedFile);
+
+//     console.log("load image called successfully", image);
 //     const height = image.height;
 //     const width = image.width;
 
-//     const canvas = createCanvas(width, height);
+//     const canvas = document.createElement("canvas");
+//     canvas.width = width;
+//     canvas.height = height;
 //     const ctx = canvas.getContext("2d");
+//     console.log("canvas created", canvas);
 
-//     for (const block of response.Blocks) {
-//       if (block.BlockType === "KEY_VALUE_SET") {
-//         const color =
-//           block.EntityTypes[0] === "KEY"
-//             ? "rgba(0, 0, 255, 1)"
-//             : "rgba(0, 255, 0, 1)";
-//         const boundingBox = block.Geometry.BoundingBox;
-//         drawBoundingBox(ctx, image, height, width, boundingBox, color, 1);
-//       } else if (block.BlockType === "TABLE") {
-//         const boundingBox = block.Geometry.BoundingBox;
-//         drawBoundingBox(
-//           ctx,
-//           image,
-//           height,
-//           width,
-//           boundingBox,
-//           "rgba(255, 0, 0, 1)",
-//           2
-//         );
-//       } else if (block.BlockType === "CELL") {
-//         const boundingBox = block.Geometry.BoundingBox;
-//         drawBoundingBox(
-//           ctx,
-//           image,
-//           height,
-//           width,
-//           boundingBox,
-//           "rgba(0, 255, 255, 1)",
-//           1
-//         );
-//       } else if (
-//         block.BlockType === "SELECTION_ELEMENT" &&
-//         block.SelectionStatus === "SELECTED"
-//       ) {
-//         const boundingBox = block.Geometry.BoundingBox;
-//         drawBoundingBox(
-//           ctx,
-//           image,
-//           height,
-//           width,
-//           boundingBox,
-//           "rgba(0, 0, 255, 1)",
-//           1
-//         );
-//       }
-//     }
+//     ctx.drawImage(image, 0, 0, width, height);
 
-//     const buffer = canvas.toBuffer("image/png");
-//     await uploadToS3(
-//       s3,
-//       buffer,
-//       bucketName,
+// for (const block of response.Blocks) {
+//   if (block.BlockType === "KEY_VALUE_SET") {
+//     const color =
+//       block.EntityTypes[0] === "KEY"
+//         ? "rgba(0, 0, 255, 1)"
+//         : "rgba(0, 255, 0, 1)";
+//     const boundingBox = block.Geometry.BoundingBox;
+//     drawBoundingBox(ctx, height, width, boundingBox, color, 1);
+//   } else if (block.BlockType === "TABLE") {
+//     const boundingBox = block.Geometry.BoundingBox;
+//     drawBoundingBox(
+//       ctx,
+//       height,
+//       width,
+//       boundingBox,
+//       "rgba(255, 0, 0, 1)",
+//       2
+//     );
+//   } else if (block.BlockType === "CELL") {
+//     const boundingBox = block.Geometry.BoundingBox;
+//     drawBoundingBox(
+//       ctx,
+//       height,
+//       width,
+//       boundingBox,
+//       "rgba(0, 255, 255, 1)",
+//       1
+//     );
+//   } else if (
+//     block.BlockType === "SELECTION_ELEMENT" &&
+//     block.SelectionStatus === "SELECTED"
+//   ) {
+//     const boundingBox = block.Geometry.BoundingBox;
+//     drawBoundingBox(
+//       ctx,
+//       height,
+//       width,
+//       boundingBox,
+//       "rgba(0, 0, 255, 1)",
+//       1
+//     );
+//   }
+// }
+
+//     const imageUrl = canvas.toDataURL("image/png");
+
+//     // Use await for the asynchronous upload operation
+//     await uploadImageToS3(
+//       imageUrl,
+//       "getstartednewbucket",
 //       `processed/${fileName.split("/").pop()}`
 //     );
 
 //     return true;
 //   } catch (error) {
+//     console.log("error----", error);
 //     return processError(error);
 //   }
 // }
 
-// export { processError, uploadToS3, useImageProcessing, processResponse };
+async function processResponse(response, fileName, uploadedFile) {
+  console.log("processResponse");
+  try {
+    // Use await to get the resolved image before proceeding
+    const image = await loadImage(uploadedFile);
+
+    console.log("load image called successfully", image);
+    const height = image.height;
+    const width = image.width;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    console.log("canvas created", canvas);
+
+    ctx.drawImage(image, 0, 0, width, height);
+    console.log("here  response.Blocks", response.Blocks);
+
+    for (const block of response.Blocks) {
+      if (block.BlockType === "KEY_VALUE_SET") {
+        const color =
+          block.EntityTypes[0] === "KEY"
+            ? "rgba(0, 0, 255, 1)"
+            : "rgba(0, 255, 0, 1)";
+        const boundingBox = block.Geometry.BoundingBox;
+        drawBoundingBox(ctx, height, width, boundingBox, color, 1);
+      } else if (block.BlockType === "TABLE") {
+        const boundingBox = block.Geometry.BoundingBox;
+        drawBoundingBox(
+          ctx,
+          height,
+          width,
+          boundingBox,
+          "rgba(255, 0, 0, 1)",
+          2
+        );
+      } else if (block.BlockType === "CELL") {
+        const boundingBox = block.Geometry.BoundingBox;
+        drawBoundingBox(
+          ctx,
+          height,
+          width,
+          boundingBox,
+          "rgba(0, 255, 255, 1)",
+          1
+        );
+      } else if (
+        block.BlockType === "SELECTION_ELEMENT" &&
+        block.SelectionStatus === "SELECTED"
+      ) {
+        const boundingBox = block.Geometry.BoundingBox;
+        drawBoundingBox(
+          ctx,
+          height,
+          width,
+          boundingBox,
+          "rgba(0, 0, 255, 1)",
+          1
+        );
+      }
+    }
+    return canvas.toDataURL("image/png");
+  } catch (error) {
+    console.log("error----", error);
+    return processError(error);
+  }
+}
+
+async function uploadImageToS3(imageUrl, bucketName, key) {
+  // Initialize S3 client
+  AWS.config.update({
+    region: "ap-south-1",
+    credentials: new AWS.Credentials({
+      accessKeyId: "AKIAYRK5RWLUDM2GONFC",
+      secretAccessKey: "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",
+    }),
+  });
+
+  const s3 = new AWS.S3();
+
+  // Convert the data URL to a blob
+  const imageBlob = await fetch(imageUrl).then((response) => response.blob());
+
+  // Upload the image to S3
+  try {
+    const params = {
+      Bucket: bucketName,
+      Key: key,
+      Body: imageBlob,
+      ContentType: "image/png", // Change the content type if necessary
+    };
+
+    await s3.upload(params).promise();
+    console.log("Image uploaded successfully.");
+  } catch (error) {
+    console.error("Error uploading image:", error);
+  }
+}
+
+export { processError, uploadToS3, processResponse };
