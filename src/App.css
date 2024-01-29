@@ -64,3 +64,36 @@
   background-color: yellow;
   font-weight: bold;
 }
+
+.highlight-box {
+  position: absolute;
+  border: 2px solid red; /* Adjust color and size as needed */
+  box-sizing: border-box;
+  pointer-events: none; /* Ensure clicks pass through the box */
+}
+
+/* 
+ */
+ .app {
+  display: flex;
+}
+
+.input-container {
+  position: relative;
+}
+
+.input-box {
+  padding: 10px;
+  font-size: 16px;
+}
+
+.line-svg {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 10px); /* Adjust as needed */
+  transform: translateY(-50%);
+}
+
+.image-container {
+  margin-left: 20px; /* Adjust margin as needed */
+}

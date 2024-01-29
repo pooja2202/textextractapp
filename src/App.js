@@ -1,57 +1,47 @@
-import React, { useEffect, useState } from "react";
-import Canvas from "./components/Canvas";
+// App.js
+import React, { useState } from "react";
+import "./App.css";
+import ImageUploader from "./components/ImageUploader";
+import TextractAnalyzer from "./components/TextAnalyzer";
 import {
-  DetectDocumentTextCommand,
   TextractClient,
   AnalyzeDocumentCommand,
 } from "@aws-sdk/client-textract";
 import { Buffer } from "buffer";
-import "./App.css";
-import DynamicForm from "./components/DynamicForm";
-import {
-  extractText,
-  mapWordId,
-  extractTableInfo,
-  getKeyMap,
-  getValueMap,
-  getKvMap,
-} from "./components/ExtractionCode";
-import { processResponse } from "./components/ImageProcessingHelper";
-import AWS from "aws-sdk";
+import DynamicForm from "./components/DynamicLeftFormSection";
 
-if (typeof window !== "undefined") {
-  window.Buffer = Buffer;
-}
+const App = () => {
+  const [uploadedImage, setUploadedImage] = useState(null);
+  const [ocrData, setOcrData] = useState(null);
+  const [finalKeyValueMap, setFinalKeyValueMap] = useState({});
+  const [selectedField, setSelectedField] = useState(null);
+  //new below
+  const [inputValue, setInputValue] = useState("");
+  const [inputFocused, setInputFocused] = useState(false);
 
-function App() {
-  //below starts for aws
-  const [src, setSrc] = useState("");
-  const [image, setImage] = useState(null);
-  const [data, setData] = useState([]);
-  const [inputNameValue, setInputNameValue] = useState("");
-  const [inputAddressValue, setInputAddressValue] = useState("");
-  const [inputEmailValue, setInputEmailValue] = useState("");
-  const [inputPhoneValue, setInputPhoneValue] = useState("");
-  const [fileValue, setFileValue] = useState(null);
-  const [modifiedImageSrc, setModifiedImageSrc] = useState(null);
-
-  const onSelectFile = (e) => {
-    if (!e.target.files || e.target.files.length === 0) {
-      return;
-    }
-    const reader = new FileReader();
-    const file = e.target.files[0];
-    setFileValue(file);
-    reader.onload = function (upload) {
-      setSrc(upload?.target?.result);
-    };
-    reader.onloadend = () => {
-      setImage(reader.result);
-    };
-    reader.readAsDataURL(file);
+  const handleInputChange = (event) => {
+    setInputValue(event.target.value);
   };
 
-  const onRunOCR = async () => {
+  const handleInputFocus = () => {
+    setInputFocused(true);
+  };
+
+  const handleInputBlur = () => {
+    setInputFocused(false);
+  };
+
+  const handleFieldClick = (fieldName) => {
+    setSelectedField(fieldName);
+  };
+
+  const handleImageUpload = async (imageFile) => {
+    const blob = Buffer.from(imageFile.split(",")[1], "base64");
+    setUploadedImage(imageFile);
+    await runOCR(blob);
+  };
+
+  const runOCR = async (blob) => {
     const client = new TextractClient({
       region: "ap-south-1",
       credentials: {
@@ -59,216 +49,395 @@ function App() {
         secretAccessKey: "M15YqgNjfenwb6fWjpZ+pwW8E88+7R/MtJfHC8oS",
       },
     });
-
-    // convert image to byte Uint8Array base 64
-    const blob = Buffer.from(src.split(",")[1], "base64");
-
     const input = {
       Document: {
         Bytes: blob,
       },
       FeatureTypes: ["FORMS", "TABLES"],
     };
-
-    // const params = {
-    //   Document: {
-    //     Bytes: blob,
-    //   },
-    //   FeatureTypes: ["FORMS", "TABLES"],
-    // };
-
-    // const command = new DetectDocumentTextCommand(params);
-    // console.log("pooja----", command);
     const command = new AnalyzeDocumentCommand(input);
-
     try {
       const data = await client.send(command);
-      // const data = await client.send(command);
-      // console.log("pooja raw data------", data);
-      const raw_text = extractText(data);
-      // console.log("pooja raw_text---", raw_text);
+      console.log("data---", data);
+      const final_method = generateKeyValuePairs(data.Blocks);
+      console.log("final_method-----", final_method);
       const word_map = mapWordId(data);
-      // console.log("pooja word_map---", word_map);
-      const table_data = extractTableInfo(data, word_map);
-      // console.log("pooja table_data----", table_data);
+      console.log("word_map-----", word_map);
+      const word_map_detail = mapWordDetail(data);
+      console.log("word_map_detail", word_map_detail);
+      setOcrData(word_map_detail);
       const key_map = getKeyMap(data, word_map);
-      // console.log("pooja key_map-----", key_map);
+      console.log("key_map----", key_map);
+      const value_id_map = getValueIdMap(data, word_map);
+      console.log("value_id_map----", value_id_map);
       const value_map = getValueMap(data, word_map);
-      // console.log("pooja value_map-----", value_map);
+      console.log("value_map----", value_map);
       const final_map = getKvMap(key_map, value_map);
-      // console.log("pooja final_map-----", final_map);
-      const modifiedImageUrl = await processResponse(
-        data,
-        "testimgpt1.png",
-        fileValue
-      );
-      setModifiedImageSrc(modifiedImageUrl);
-      // process data
-      if (data?.Blocks) {
-        const filteredArray = data?.Blocks.filter(
-          (item) => item.BlockType === "LINE"
-        );
-
-        setData(filteredArray);
-        // setData(data.Blocks);
-      }
+      console.log("final_map------", final_map);
+      setFinalKeyValueMap(final_map);
     } catch (error) {
       console.log("err", error);
-      // error handling
     }
   };
 
-  const texts = data?.map((item) => item.Text);
-  //canvas ->
-  const draw = (context, count, isHovering, x, y, texts) => {
-    let clickHandled = false;
-    context.clearRect(0, 0, context.canvas.width, context.canvas.height);
-    context.fillStyle = "#9781b0";
-    const lineHeight = 30; // Adjust this value as needed for spacing
-    const rectHeight = (texts.length + 2) * lineHeight; // Add one for padding
-    context.fillRect(10, 10, 800, rectHeight);
-    // Add text
+  function generateKeyValuePairs(input) {
+    // const outputData = {};
+    // const keywordMap = {};
 
-    const text = "data";
-    context.fillStyle = isHovering ? "blue" : "black";
-    context.font = "20px Arial";
-    // context.fillText(text, 20, 50);
-    if (texts && texts.length > 0) {
-      texts.forEach((text, index) => {
-        const textX = 20;
-        const textY = 50 + index * 30; // Adjust vertical spacing
-        context.fillText(text, textX, textY);
+    // input.forEach((item, index) => {
+    //   if (item.BlockType === "WORD" && item.TextType === "PRINTED") {
+    //     if (!keywordMap.hasOwnProperty(item.Text)) {
+    //       keywordMap[item.Text] = [];
+    //     }
+    //     keywordMap[item.Text].push(item.Id);
+    //   }
+    // });
 
-        if (
-          !clickHandled &&
-          x >= textX &&
-          x <= textX + context.measureText(text).width &&
-          y >= textY - parseInt(context.font) &&
-          y <= textY
-        ) {
-          handleClick(text);
-          clickHandled = true;
+    // Object.keys(keywordMap).forEach((keyword, index) => {
+    //   const key = keyword;
+    //   const value = keywordMap[keyword]
+    //     .map((id) => input.find((item) => item.Id === id).Text)
+    //     .join("");
+    //   const valueIds = keywordMap[keyword];
+    //   outputData[index + 1] = { key, value, value_id: valueIds };
+    // });
+
+    // console.log(outputData);
+    // return outputData;
+    //
+    const outputData = {};
+    const keywordMap = {};
+
+    input.forEach((item, index) => {
+      if (item.BlockType === "WORD" && item.TextType === "PRINTED") {
+        if (!keywordMap.hasOwnProperty(item.Text)) {
+          keywordMap[item.Text] = [];
         }
-      });
+        keywordMap[item.Text].push(item.Id);
+      }
+    });
+
+    Object.keys(keywordMap).forEach((keyword, index) => {
+      const key = keyword;
+      const value = keywordMap[keyword]
+        .map((id) => input.find((item) => item.Id === id).Text)
+        .join(" ");
+      const valueIds = keywordMap[keyword];
+      outputData[index + 1] = { key, value, value_id: valueIds };
+    });
+
+    console.log(outputData);
+    return outputData;
+  }
+
+  function getValueIdMap(response, wordMap) {
+    // Check if response is defined and contains the 'Blocks' property
+    if (!response || !response.Blocks || !Array.isArray(response.Blocks)) {
+      console.error("Invalid or missing response structure");
+      return {};
     }
-    if (isHovering) {
-      const textMetrics = context.measureText(text);
-      const textWidth = textMetrics.width;
-      const textHeight = parseInt(context.font);
-      const textX = 20;
-      const textY = 50 - textHeight;
-      context.strokeStyle = "blue";
-      context.setLineDash([5, 5]);
-      context.strokeRect(textX, textY, textWidth, textHeight);
-      context.setLineDash([]);
-      // Check if click is within the bounds of the text
+
+    // Initialize an empty object to store the value IDs and values
+    const valueMap = {};
+
+    // Iterate through each block in the response data
+    response.Blocks.forEach((block) => {
+      // Check if the block represents a key-value set and contains a value
       if (
-        x >= textX &&
-        x <= textX + textWidth &&
-        y >= textY &&
-        y <= textY + textHeight
+        block.BlockType === "KEY_VALUE_SET" &&
+        block.EntityTypes.includes("VALUE") &&
+        block.Relationships && // Check if Relationships property exists
+        Array.isArray(block.Relationships)
       ) {
-        handleClick(text);
+        // Initialize variables to store the value ID and value
+        let valueId = "";
+        let value = "";
+
+        // Iterate through relationships within the block
+        block.Relationships.forEach((relation) => {
+          // If the relationship type is "CHILD," map the Ids to words using wordMap
+          if (
+            relation.Type === "CHILD" &&
+            relation.Ids &&
+            Array.isArray(relation.Ids)
+          ) {
+            value = relation.Ids.map((id) => wordMap[id]).join(" ");
+          }
+
+          // Store the value ID associated with the value
+          valueId = relation.Ids;
+        });
+
+        // Add the value ID and value to the valueMap object
+        valueMap[valueId] = value;
+      }
+    });
+
+    // Return the populated valueMap object
+    return valueMap;
+  }
+
+  // function generateKeyValuePairs(input) {
+  //   const output = {};
+
+  //   input.forEach((item) => {
+  //     if (item.BlockType === "KEY_VALUE_SET") {
+  //       const key = item.Text;
+  //       console.log("key pooja-----", key);
+  //       const value = item.EntityTypes.includes("VALUE")
+  //         ? item.Text.split(" : ")[1]
+  //         : null;
+  //       const valueIds = item.Relationships[0].Ids.join(",");
+
+  //       const index = Object.keys(output).length + 1;
+  //       output[index] = {
+  //         key: key,
+  //         value: value,
+  //         value_id: valueIds,
+  //       };
+  //     }
+  //   });
+
+  //   return output;
+  // }
+
+  function mapWordId(response) {
+    const wordMap = {};
+    response.Blocks.forEach((block) => {
+      if (block.BlockType === "WORD") {
+        wordMap[block.Id] = block.Text;
+      }
+      if (block.BlockType === "SELECTION_ELEMENT") {
+        wordMap[block.Id] = block.SelectionStatus;
+      }
+    });
+    return wordMap;
+  }
+
+  function mapWordDetail(response) {
+    const dummyKeyValuePairs = [];
+    for (let i = 0; i < response.Blocks.length; i++) {
+      if (response.Blocks[i].BlockType === "WORD") {
+        dummyKeyValuePairs.push({
+          key: response.Blocks[i].Id,
+          value: response.Blocks[i].Text,
+          BoundingBox: response.Blocks[i].Geometry.BoundingBox,
+        });
       }
     }
+    return dummyKeyValuePairs;
+  }
+
+  function getKeyMap(response, wordMap) {
+    const keyMap = {};
+    response.Blocks.forEach((block) => {
+      if (
+        block.BlockType === "KEY_VALUE_SET" &&
+        block.EntityTypes.includes("KEY")
+      ) {
+        let valueId;
+        let key = "";
+        block.Relationships.forEach((relation) => {
+          if (relation.Type === "VALUE") {
+            valueId = relation.Ids;
+          }
+          if (relation.Type === "CHILD") {
+            key = relation.Ids.map((id) => wordMap[id]).join(" ");
+          }
+        });
+        keyMap[key] = valueId;
+      }
+    });
+    return keyMap;
+  }
+
+  function getValueMap(response, wordMap) {
+    const valueMap = {};
+    response.Blocks.forEach((block) => {
+      if (
+        block.BlockType === "KEY_VALUE_SET" &&
+        block.EntityTypes.includes("VALUE")
+      ) {
+        let value = "";
+        if (block.Relationships) {
+          block.Relationships.forEach((relation) => {
+            if (relation.Type === "CHILD") {
+              value = relation.Ids.map((id) => wordMap[id]).join(" ");
+            }
+          });
+        } else {
+          value = "VALUE_NOT_FOUND";
+        }
+        valueMap[block.Id] = value;
+      }
+    });
+    return valueMap;
+  }
+
+  function getKvMap(keyMap, valueMap) {
+    const finalMap = {};
+    for (const key in keyMap) {
+      finalMap[key] = keyMap[key].map((id) => valueMap[id]).join("");
+    }
+    return finalMap;
+  }
+
+  const calculateXCoordinate = (ocrData, selectedField, imageWidth) => {
+    if (!ocrData || !selectedField || !imageWidth) return null;
+
+    const selectedBlock = ocrData.find(
+      (block) => block.key === selectedField.key
+    );
+    if (!selectedBlock) return null;
+
+    // Calculate the x-coordinate based on the BoundingBox
+    return (
+      (selectedBlock.BoundingBox.Left + selectedBlock.BoundingBox.Width / 2) *
+      imageWidth
+    );
   };
 
-  const handleClick = (text) => {
-    console.log(text);
-  };
+  const calculateYCoordinate = (ocrData, selectedField, imageHeight) => {
+    if (!ocrData || !selectedField || !imageHeight) return null;
 
-  const handleInputNameChange = (e) => {
-    setInputNameValue(e.target.value);
-  };
+    const selectedBlock = ocrData.find(
+      (block) => block.key === selectedField.key
+    );
+    if (!selectedBlock) return null;
 
-  const handleInputAddressChange = (e) => {
-    setInputAddressValue(e.target.value);
-  };
-
-  const handleInputPhoneChange = (e) => {
-    setInputPhoneValue(e.target.value);
-  };
-  const handleInputEmailChange = (e) => {
-    setInputEmailValue(e.target.value);
+    // Calculate the y-coordinate based on the BoundingBox
+    return (
+      selectedBlock.BoundingBox.Top * imageHeight +
+      (selectedBlock.BoundingBox.Height / 2) * imageHeight
+    );
   };
 
   return (
-    <div className="container">
-      <div className="left-section">
-        <div>
-          <div>
-            <label>Name : </label>
-            <input
-              type="text"
-              value={inputNameValue}
-              onChange={handleInputNameChange}
-            />
-          </div>
-          <div>
-            <label>Address : </label>
-            <input
-              type="text"
-              value={inputAddressValue}
-              onChange={handleInputAddressChange}
-            />
-          </div>
-          <div>
-            <label>Email : </label>
-            <input
-              type="text"
-              value={inputEmailValue}
-              onChange={handleInputEmailChange}
-            />
-          </div>
-          <div>
-            <label>Phone : </label>
-            <input
-              type="text"
-              value={inputPhoneValue}
-              onChange={handleInputPhoneChange}
-            />
-          </div>
-        </div>
-      </div>
-      <div className="center-section">
-        <input
-          className="inputfile"
-          id="file"
-          type="file"
-          name="file"
-          onChange={onSelectFile}
-        />
-        {image && <img src={image} alt="Uploaded" className="uploaded-image" />}
-        <button onClick={onRunOCR} style={{ margin: "10px" }}>
-          Run OCR
-        </button>
-      </div>
-      <div className="right-section">
-        <p>Rendered Image Data</p>
-        {/* <div style={{ border: "1px" }}>
-          {data?.map((item, index) => {
-            return (
-              <span key={index} style={{ margin: "2px", padding: "2px" }}>
-                {item.Text}
-              </span>
-            );
-          })}
-        </div> */}
-        <div style={{ width: "200px", height: "200px" }}>
-          {modifiedImageSrc && (
-            <img src={modifiedImageSrc} alt="Modified Image" />
+    <>
+      {/* // <div style={{ display: "flex" }}>
+    //   <div
+    //     style={{ width: "600px", height: "600px", backgroundColor: "#ebc4bb" }}
+    //   >
+    //     {uploadedImage && ocrData && <DynamicForm dataObj={finalKeyValueMap} />}
+    //   </div>
+    //   <div
+    //     style={{ width: "15vw", height: "600px", backgroundColor: "#d78b79" }}
+    //   >
+    //     <ImageUploader onImageUpload={handleImageUpload} />
+    //   </div>
+    //   <div>
+    //     {uploadedImage && ocrData && (
+    //       <TextractAnalyzer image={uploadedImage} ocrData={ocrData} />
+    //     )}
+    //   </div>
+    // </div> */}
+      {/* <div className="app">
+        <div className="input-container">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            className="input-box"
+          />
+          {inputFocused && (
+            <svg className="line-svg" height="100" width="100">
+              <line
+                x1="0"
+                y1="0"
+                x2="50"
+                y2="50"
+                style={{ stroke: "black", strokeWidth: 2 }}
+              />
+            </svg>
           )}
         </div>
-        {/* <Canvas
-          width="500"
-          height="1900"
-          draw={(context, count, isHovering, x, y) =>
-            draw(context, count, isHovering, x, y, texts)
-          }
-        /> */}
+        <div className="image-container">
+          <img
+            src="https://getstartednewbucket.s3.ap-south-1.amazonaws.com/testimgpt1.png"
+            alt="Your Image"
+            width={200}
+            height={200}
+          />
+        </div>
+      </div> */}
+      <div style={{ display: "flex" }}>
+        <div
+          style={{
+            width: "600px",
+            height: "600px",
+            backgroundColor: "#ebc4bb",
+          }}
+        >
+          {uploadedImage && ocrData && (
+            <DynamicForm
+              dataObj={finalKeyValueMap}
+              onFieldClick={handleFieldClick}
+            />
+          )}
+        </div>
+        <div
+          style={{ width: "15vw", height: "600px", backgroundColor: "#d78b79" }}
+        >
+          <ImageUploader onImageUpload={handleImageUpload} />
+        </div>
+        <div>
+          {uploadedImage && ocrData && (
+            <TextractAnalyzer
+              image={uploadedImage}
+              ocrData={ocrData}
+              selectedField={selectedField}
+            />
+          )}
+        </div>
       </div>
-    </div>
+      {/* <div style={{ display: "flex" }}>
+        <div
+          style={{
+            width: "600px",
+            height: "600px",
+            backgroundColor: "#ebc4bb",
+          }}
+        >
+          {uploadedImage && ocrData && (
+            <DynamicForm
+              dataObj={finalKeyValueMap}
+              onFieldClick={handleFieldClick}
+            />
+          )}
+        </div>
+        <div>
+          {console.log(selectedField)}
+          {selectedField && (
+            <svg className="line-svg" height="100%" width="100%">
+              <line
+                x1={selectedField.position.left}
+                y1={selectedField.position.top}
+                x2={calculateXCoordinate(ocrData, selectedField, 300)}
+                y2={calculateYCoordinate(ocrData, selectedField, 300)}
+                style={{ stroke: "black", strokeWidth: 2 }}
+              />
+            </svg>
+          )}
+        </div>
+        <div
+          style={{ width: "15vw", height: "600px", backgroundColor: "#d78b79" }}
+        >
+          <ImageUploader onImageUpload={handleImageUpload} />
+        </div>
+        <div>
+          {uploadedImage && ocrData && (
+            <TextractAnalyzer
+              image={uploadedImage}
+              ocrData={ocrData}
+              selectedField={selectedField}
+            />
+          )}
+        </div>
+      </div> */}
+    </>
   );
-}
+};
 
 export default App;

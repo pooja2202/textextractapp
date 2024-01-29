@@ -23,6 +23,20 @@ function mapWordId(response) {
   return wordMap;
 }
 
+function mapWordDetail(response) {
+  const dummyKeyValuePairs = [];
+  for (let i = 0; i < response.Blocks.length; i++) {
+    if (response.Blocks[i].BlockType === "WORD") {
+      dummyKeyValuePairs.push({
+        key: response.Blocks[i].Id,
+        value: response.Blocks[i].Text,
+        BoundingBox: response.Blocks[i].Geometry.BoundingBox,
+      });
+    }
+  }
+  return dummyKeyValuePairs;
+}
+
 function extractTableInfo(response, wordMap) {
   let row = [];
   const table = {};
@@ -123,4 +137,5 @@ export {
   getKeyMap,
   getValueMap,
   getKvMap,
+  mapWordDetail,
 };
